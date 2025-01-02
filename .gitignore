@@ -1,0 +1,22 @@
+### ALL ###
+###
+__init__.py
+app.ini
+app.log
+deprecated_*.*
+DEPRECATED_*.*
+zDEPRECATED_*.*
+zDeprecated_*.*
+__pycache__
+.ipynb_checkpoints
+nohup.out
+#wrangler/__pycache__/*
+### DATA ###
+wrangler/data/
+wrangler/data/tmp/*
+### LOGS ###
+wrangler/logs/*
+mining/logs/*
+visuals/logs/*
+### SENSITIVE ###
+.env
