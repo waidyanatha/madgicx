@@ -69,6 +69,10 @@ wheel = "^0.38.4"
 #xeus-python = "^0.15.12"
 db-dtypes = "^1.3.1"
 ydata-profiling = "^4.12.1"
+hmmlearn = "^0.3.3"
+tensorflow = "^2.18.0"
+tensorflow-probability = "^0.25.0"
+tf-keras = "^2.18.0"
 
 [build-system]
 requires = ["poetry-core"]
