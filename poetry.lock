@@ -1398,6 +1398,19 @@ test = ["certifi", "cryptography-vectors (==43.0.3)", "pretend", "pytest (>=6.2.
 test-randomorder = ["pytest-randomly"]
 
 [[package]]
+name = "currency-converter"
+version = "0.5.5"
+description = "Currency Converter"
+optional = false
+python-versions = "*"
+files = [
+    {file = "currency.converter-0.5.5.tar.gz", hash = "sha256:2bb06b9b9aee8ab5ec10b4ab7dec2fd4b32456365f4735f93468824eef01b034"},
+]
+
+[package.dependencies]
+setuptools = "*"
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 description = "Composable style cycles"
@@ -11622,4 +11635,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<=3.11"
-content-hash = "8b3ef287e9f2fd93abd836cab4332c1a4aad4ecce487fde8f1fc0827d3de4df9"
+content-hash = "5bbb8164c666eef07c6171a9dd488e14ce0028815a5c49f011d6738572f213cd"
