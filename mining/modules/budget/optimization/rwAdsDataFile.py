@@ -263,7 +263,67 @@ class dataWorkLoads(attr.properties):
             return self._data
 
 
-    ''' Function --- READ REALM ---
+    ''' Function --- WRITE REALM ---
 
             author: <samana.thetha@gmail.com
     '''
+    def write_realm(
+        self,
+        realm: str = None, # mandatory either portfolio, indicator, rebalance, or marketcap
+        data : DataFrame=None,
+        fname: str = None, # mandatory file name
+        fpath: str = None, # mandatory file path
+        **kwargs
+    ) -> DataFrame:
+        """
+        Description:
+            Read the realm specific data for a given date range from file
+        Attributes :
+
+        """
+        __s_fn_id__ = f"{self.__name__} function <read_realm>"
+
+        # __def_date_attr__ = "updated_time"
+
+        # __def_options_dict__ = {"inferSchema":True,
+        #                         "header":True,
+        #                         "delimiter":",",
+        #                         "pathGlobFilter":'*.csv',
+        #                         "recursiveFileLookup":True,
+        #                         }
+
+
+        try:
+            self.realm= realm
+            self.data = data
+
+            ''' validate file name and path '''
+            if fname is None or "".join(fname.split())=="":
+                raise AttributeError("Valid file name string is required; %s type was given" % type(fname))
+            if fpath is None or "".join(fpath.split())=="":
+                fpath = pkgConf.get("CWDS","DATA")
+                logger.warning("%s invalid file path replaced with default path: %s", 
+                               __s_fn_id__, fpath )
+            # if "OPTIONS" not in kwargs.keys() or not isinstance(kwargs['OPTIONS'], dict) \
+            #     or len(kwargs['OPTIONS'])<=0:
+            #     kwargs['OPTIONS'] = __def_options_dict__
+
+            write_to=clsFile.write_data(
+                file_name=fname,
+                folder_path=fpath,
+                data=self._data
+            )
+            if not isinstance(write_to,str) or "".join(write_to.split())=="":
+                raise RuntimeError("Failed to save data to %s" % fname)
+
+        except Exception as err:
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+
+        finally:
+            logger.debug("%s wrote %d rows with %d columns to %s", 
+                         __s_fn_id__, self._data.count(), len(self._data.columns), 
+                         write_to.upper())
+            return write_to
+
