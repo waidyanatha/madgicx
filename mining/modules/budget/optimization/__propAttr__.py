@@ -85,11 +85,13 @@ class properties():
         self._realmList = [
             'CAMPAIGN', # operation and marketing on sales
             'CREATIVE', # sequence of creative decisions and impact
-            'ADSET',  # collection of ads with common goals
+            'ADSET',  # collection of ads with common goals for a campaign
+            'AD',   # individual ads of an adset
             'DEMOGRAPHY',  # target demography
             'GEOGRAPHY',   # target location
-            'GOAL', # collection of state transitions
-            'PERFORMANCE', # time series click,impression, counts 
+            'OBJECTIVE',   # objective of the adset
+            'GOAL', # optimization goal of the adset
+            'ACTION', # conversion events or actions towards the goal
         ]
 
         global pkgConf  # this package configparser class instance
@@ -262,7 +264,7 @@ class properties():
         return self._prediction
 
     @prediction.setter
-    def realm(self,prediction) -> DataFrame:
+    def prediction(self,prediction) -> DataFrame:
 
         __s_fn_id__ = f"{self.__name__} function <realm.@setter>"
 
