@@ -245,7 +245,7 @@ class dataWorkLoads(attr.properties):
             to_drop = [k for k, v in null_counts.items() if v >= self._data.count()]
             self._data = self._data.drop(*to_drop)
             logger.debug("%s Filtered down to %d rows and reduced to %d columns", 
-                         __s_fn_id__, obj_sdf.count(), len(self._data.columns))
+                         __s_fn_id__, self._data.count(), len(self._data.columns))
 
             ''' final check on the dataframe '''
             if not isinstance(self._data, DataFrame) or self._data.count()<=0:
