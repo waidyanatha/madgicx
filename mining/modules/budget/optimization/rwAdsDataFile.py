@@ -81,16 +81,6 @@ class dataWorkLoads(attr.properties):
                                       self.__package__,self.__name__])
         else:
             self.__desc__ = desc
-        ''' set file store mode '''
-        if f_store_mode is not None and "".join(f_store_mode.split())!="":
-            self._storeMode = f_store_mode
-        else:
-            self._storeMode = 'local-fs'
-        ''' set file store root '''
-        if f_store_root is not None and "".join(f_store_root.split())!="":
-            self._storeRoot = f_store_root
-        else:
-            self._storeRoot = 'local-fs'
 
         global pkgConf  # this package configparser class instance
         global appConf  # configparser class instance
@@ -123,6 +113,16 @@ class dataWorkLoads(attr.properties):
             logger.info('########################################################')
             logger.info("%s Class",self.__name__)
 
+            ''' set file store mode '''
+            if f_store_mode is not None and "".join(f_store_mode.split())!="":
+                self._storeMode = f_store_mode
+            else:
+                self._storeMode = 'local-fs'
+            ''' set file store root '''
+            if f_store_root is not None and "".join(f_store_root.split())!="":
+                self._storeRoot = f_store_root
+            else:
+                self._storeRoot = pkgConf.get("CWDS","DATA")
             ''' import spark File work load utils to read and write data '''
             from rezaware.modules.etl.loader import sparkFile as file
             clsFile = file.dataWorkLoads(
@@ -281,7 +281,7 @@ class dataWorkLoads(attr.properties):
         Attributes :
 
         """
-        __s_fn_id__ = f"{self.__name__} function <read_realm>"
+        __s_fn_id__ = f"{self.__name__} function <write_realm>"
 
         # __def_date_attr__ = "updated_time"
 
