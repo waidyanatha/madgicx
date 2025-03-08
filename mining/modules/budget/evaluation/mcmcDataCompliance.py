@@ -192,6 +192,11 @@ class dataWorkLoads(attr.properties):
             return return_dict_
     
     
+    ''' Function --- DATA VOLUME ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
     def data_volume(data, min_samples=1000):
         """
         Check if there is sufficient data volume.
@@ -240,6 +245,11 @@ class dataWorkLoads(attr.properties):
             return return_dict_
     
     
+    ''' Function --- REPRESENTATIVENESS ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
     def representativeness(data, multivariate=False, n_bins=20):
         """
         Visualize the distribution to check for representativeness.
@@ -294,7 +304,7 @@ class dataWorkLoads(attr.properties):
                     pca = PCA(n_components=1)
                     return_dict_["data"] = pca.fit_transform(data_scaled).flatten()
                     # return_dict_["data"]= plot_data
-                    _explain_str += "Note: Using PCA first component for representativeness visualization"
+                    _explain_str += "Note: Using PCA first component for representativeness visualization.\n"
 
                 if not isinstance(return_dict_["data"],np.ndarray) or return_dict_["data"].shape[0]<=0:
                     raise ChildProcessError("Failed to impute or apply PCA returned %s" 
@@ -323,7 +333,7 @@ class dataWorkLoads(attr.properties):
                 hist, bin_edges = np.histogram(return_dict_["data"], bins=n_bins)
                 empty_bins = np.sum(hist == 0)
                 
-                _explain_str += f"empty_regions': {empty_bins},  nan_percentage: {nan_percentage}, "
+                _explain_str += f"empty_regions': {empty_bins},  nan_percentage: {nan_percentage},\n"
                 _explain_str += f"valid_data': True, histogram: {hist}, bin_edges': {bin_edges}.\n "
                 
                 # Add text annotations
@@ -340,6 +350,7 @@ class dataWorkLoads(attr.properties):
             logger.error("%s %s \n",__s_fn_id__, err)
             logger.debug(traceback.format_exc())
             print("[Error]"+__s_fn_id__, err)
+            matplotlib.use(current_backend)
             return return_dict_
 
         finally:
@@ -352,7 +363,12 @@ class dataWorkLoads(attr.properties):
             return return_dict_
     
     
-    def check_dimensionality(data, max_recommended_dim=20):
+    ''' Function --- DIMENSIONALITY ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
+    def dimensionality(data, max_recommended_dim=20):
         """
         Check the dimensionality of the data and provide guidance.
         
@@ -368,25 +384,46 @@ class dataWorkLoads(attr.properties):
         bool
             True if dimensionality is manageable, False otherwise
         """
-        if len(data.shape) == 1:
-            n_dim = 1
-        else:
-            n_dim = data.shape[1]
-        
-        print(f"Data dimensionality: {n_dim}")
-        
-        if n_dim <= max_recommended_dim:
-            print(f"✓ Dimensionality is manageable for standard MCMC")
-            return True
-        else:
-            print(f"✗ High dimensionality detected. Consider:")
-            print("  - Dimensionality reduction techniques")
-            print("  - Specialized MCMC methods for high dimensions")
-            print("  - Hamiltonian Monte Carlo")
-            return False
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <dimensionality>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "dimensionality"
+        return_dict_["comply"] = None
+        _explain_str = ""
+
+        try:
+            if len(data.shape) == 1:
+                n_dim = 1
+            else:
+                n_dim = data.shape[1]
+            
+            _explain_str += f"Data dimensionality: {n_dim}\n"
+            
+            if n_dim <= max_recommended_dim:
+                _explain_str += f"✓ Dimensionality is manageable for standard MCMC. "
+                return_dict_["comply"] = True
+            else:
+                _explain_str += f"✗ High dimensionality detected. Consider: "
+                _explain_str += "Dimensionality reduction techniques, "
+                _explain_str += "Specialized MCMC methods for high dimensions, "
+                _explain_str += "Hamiltonian Monte Carlo."
+                return_dict_["comply"] = False
     
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            return return_dict_
+
+        finally:
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Dimensionality Test completed with %s data rows for plot", 
+                         __s_fn_id__, str(return_dict_))
+            return return_dict_
+
     
-    def check_correlation_structure(data):
+    def correlation_structure(data):
         """
         Analyze the correlation structure of the data.
         
@@ -395,41 +432,72 @@ class dataWorkLoads(attr.properties):
         data : array-like
             Data to test, should be 2D (samples x features)
         """
-        if len(data.shape) == 1:
-            # For 1D data, show autocorrelation
-            fig, ax = plt.subplots(figsize=(10, 6))
-            plot_acf(data, ax=ax, lags=30)
-            plt.title('Autocorrelation Function')
-            plt.show()
-            
-            # Check for significant autocorrelation
-            acf_values = acf(data, nlags=30)
-            significant_lags = np.sum(np.abs(acf_values[1:]) > 1.96/np.sqrt(len(data)))
-            
-            if significant_lags > 5:
-                print(f"✗ Significant autocorrelation detected at {significant_lags} lags")
-                print("  High autocorrelation may slow MCMC convergence")
+
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <correlation_structure>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "correlation structure"
+        return_dict_["comply"] = None
+        return_dict_["plot"] = None
+        _explain_str = ""
+
+        current_backend = matplotlib.get_backend()
+        matplotlib.use('Agg')  # Agg backend doesn't display figures
+
+        try:
+            if len(data.shape) == 1:
+                return_dict_["data"]=data
+
+                # For 1D data, show autocorrelation
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.plot_acf(return_dict_["data"], ax=ax, lags=30)
+                ax.set_title('Autocorrelation Function')
+                acf_values = acf(return_dict_["data"], nlags=30)
+                significant_lags = np.sum(
+                    np.abs(acf_values[1:]) > 1.96/np.sqrt(len(return_dict_["data"])))
+                
+                if significant_lags > 5:
+                    return_dict_["comply"] = False
+                    _explain_str += f"✗ Significant autocorrelation detected at {significant_lags} lags. "
+                    _explain_str += f"High autocorrelation may slow MCMC convergence. "
+                else:
+                    print("✓ Autocorrelation appears manageable")
             else:
-                print("✓ Autocorrelation appears manageable")
-        else:
-            # For multivariate data, show correlation matrix
-            df = pd.DataFrame(data)
-            corr_matrix = df.corr()
-            
-            plt.figure(figsize=(10, 8))
-            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1)
-            plt.title('Correlation Matrix')
-            plt.show()
-            
-            # Count high correlations
-            high_corr_count = np.sum(np.abs(np.triu(corr_matrix.values, k=1)) > 0.7)
-            
-            if high_corr_count > 0:
-                print(f"✗ Found {high_corr_count} pairs of highly correlated variables")
-                print("  High correlation may slow MCMC convergence")
-            else:
-                print("✓ Correlation structure appears manageable")
+                # For multivariate data, show correlation matrix
+                df = pd.DataFrame(data)
+                return_dict_['data'] = df.corr()
+
+                fig, ax = plt.subplots(figsize=(10, 8))
+                sns.heatmap(return_dict_['data'], annot=True, cmap='coolwarm', vmin=-1, vmax=1)
+                ax.set_title('Correlation Matrix')
+                
+                # Count high correlations
+                high_corr_count = np.sum(np.abs(np.triu(return_dict_['data'].values, k=1)) > 0.7)
+                
+                if high_corr_count > 0:
+                    return_dict_["comply"] = False
+                    _explain_str += f"✗ Found {high_corr_count} pairs of highly correlated variables. "
+                    _explain_str += "High correlation may slow MCMC convergence. "
+                else:
+                    return_dict_["comply"] = True
+                    _explain_str += "✓ Correlation structure appears manageable"
     
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            matplotlib.use(current_backend)
+            return return_dict_
+
+        finally:
+            return_dict_["plot"] = fig
+            _explain_str += "Note: Visual inspection is recommended to ensure representativeness. "
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Correlation Structure Test completed with %d data rows for plot", 
+                         __s_fn_id__, len(return_dict_['data']))
+            matplotlib.use(current_backend)
+            return return_dict_
     
     def check_multimodality(data, bandwidth=0.5, prominence=0.05):
         """
@@ -712,7 +780,7 @@ class dataWorkLoads(attr.properties):
 
             ''' Run checks '''
             results = []
-            ''' STATIONARITY '''
+            ''' 1. STATIONARITY '''
             if "stationarity" in checks and time_series:
                 print("running STATIONARITY CHECK ...")
                 results.append(dataWorkLoads.stationarity(
@@ -723,40 +791,26 @@ class dataWorkLoads(attr.properties):
                 logger.warning("Skipped stationarity (not time series data)")
             else:
                 pass
-            ''' DATA VOLUME '''
+            ''' 2. DATA VOLUME '''
             if "data volume" in checks:
                 print("running DATA VOLUME CHECK ...")
                 results.append(dataWorkLoads.data_volume(data=data))
-            ''' REPRESENTATIVENESS '''
+            ''' 3. REPRESENTATIVENESS '''
             if "representativeness" in checks:
                 print("running REPRESENTATIVENESS CHECK ...")
-                # schema = {col: col_type for col, col_type in self._data.dtypes}
-                # cast_cols = [ col for col, col_type in schema.items() if col_type in ['date', 'datetime']]
-                # _sdf = functools.reduce(
-                #     lambda df, x: df.withColumn(x, F.unix_timestamp(x)),
-                #     cast_cols, self._data,
-                #     )
-                # rep_data = np.asarray(_sdf.toPandas())
                 results.append(
                     dataWorkLoads.representativeness(data=data, 
                     multivariate=multivariate))
-            
-            # if multivariate:
-            #     # For multivariate data, we'll use PCA for visualization
-            #     scaler = StandardScaler()
-            #     data_scaled = scaler.fit_transform(data)
-            #     pca = PCA(n_components=1)
-            #     data_pca = pca.fit_transform(data_scaled).flatten()
-            #     print("Note: Using PCA first component for representativeness visualization")
-            #     results.append(check_representativeness(data_pca))
-            # else:
-            #     results.append(check_representativeness(data))
-            
-            # print("\n==== 4. DIMENSIONALITY CHECK ====")
-            # check_dimensionality(data)
-            
-            # print("\n==== 5. CORRELATION STRUCTURE CHECK ====")
-            # check_correlation_structure(data)
+            ''' 4. DIMENSIONALITY '''
+            if "dimensionality" in checks:
+                print("running DIMENSIONALITY CHECK ...")
+                results.append(
+                    dataWorkLoads.dimensionality(data, max_recommended_dim=20))
+            ''' 5. CORRELATION STRUCTURE '''
+            if "correlation structure" in checks:
+                print("running CORRELATION STRUCTURE CHECK ...")
+                results.append(
+                    dataWorkLoads.correlation_structure(data))
             
             # print("\n==== 6. MULTIMODALITY CHECK ====")
             # if multivariate:
