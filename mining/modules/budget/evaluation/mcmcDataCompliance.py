@@ -27,7 +27,7 @@ try:
 
     import numpy as np
     import pandas as pd
-    import matplotlib.pyplot as plt
+    import matplotlib #.pyplot as plt
     import scipy.stats as stats
     from statsmodels.tsa.stattools import adfuller, acf
     from statsmodels.graphics.tsaplots import plot_acf
@@ -124,26 +124,6 @@ class dataWorkLoads(attr.properties):
             ''' set a new logger section '''
             logger.info('########################################################')
             logger.info("%s Class",self.__name__)
-
-            # ''' set file store mode '''
-            # if f_store_mode is not None and "".join(f_store_mode.split())!="":
-            #     self._storeMode = f_store_mode
-            # else:
-            #     self._storeMode = 'local-fs'
-            # ''' set file store root '''
-            # if f_store_root is not None and "".join(f_store_root.split())!="":
-            #     self._storeRoot = f_store_root
-            # else:
-            #     self._storeRoot = pkgConf.get("CWDS","DATA")
-            # ''' import spark File work load utils to read and write data '''
-            # from mining.modules.budget.optimization import rwAdsDataFile as file
-            # clsFile = file.dataWorkLoads(
-            #     desc = self.__desc__,
-            #     f_store_mode=self._storeMode,
-            #     f_store_root=self._storeRoot,
-            #     jar_dir=None,
-            # )
-
             logger.debug("%s initialization for %s module package %s %s done.\nStart workloads: %s."
                          %(self.__app__,
                            self.__module__,
@@ -276,72 +256,99 @@ class dataWorkLoads(attr.properties):
         __s_fn_id__ = f"{dataWorkLoads.__name__} function <representativeness>"
 
         return_dict_ = {}
+        return_dict_["check"] = "representativeness"
+        return_dict_["comply"] = None
+        return_dict_["plot"] = None
+        _explain_str = ""
+        current_backend = matplotlib.get_backend()
+        matplotlib.use('Agg')  # Agg backend doesn't display figures
 
         try:           
-            return_dict_["check"] = "representativeness"
-            return_dict_["comply"] = None
-            _explain_str = ""
-
             data_clean = data[~np.isnan(data)].reshape(-1, 1)
-            print(data.shape, data_clean.shape)
-            if len(data_clean) == 0:
-                _explain_str+="✗ All data values are NaN. Cannot perform representativeness check."
+            nan_count = len(data) - len(data_clean)
+            nan_percentage = 100 * nan_count / len(data) if len(data) > 0 else 0
 
-                # elif len(data_clean) < len(data):
+            if len(data_clean) == 0:
+                _explain_str +="✗ All data values are NaN. Cannot perform representativeness check. "
+                _explain_str +="\nempty_regions= 0, nan_percentage: 100.0, valid_data: FALSE "
+
+                # Create an empty figure if all data is NaN
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.text(0.5, 0.5, "All data values are NaN",
+                        horizontalalignment='center', verticalalignment='center',
+                        transform=ax.transAxes, fontsize=14)
+                ax.set_title('Data Distribution (No Valid Data)')
+                # return_dict_["plot"] = fig
+                # raise AttributeError("%s Data containes NaN" % type(data_clean))
             else:
                 logger.warning("%s Removed %d NaN values for visualization", 
                                __s_fn_id__, (len(data) - len(data_clean)))
+                ''' fill NaN with mean '''
                 imputer = SimpleImputer(strategy='mean')
-                data_imputed = imputer.fit_transform(data_clean)
-                print("data_imputed", len(data_imputed))
+                return_dict_["data"] = imputer.fit_transform(data_clean)
+    
                 if multivariate:
                     # For multivariate data, we'll use PCA for visualization
                     scaler = StandardScaler()
-                    data_scaled = scaler.fit_transform(data_imputed)
+                    data_scaled = scaler.fit_transform(return_dict_["data"])
                     pca = PCA(n_components=1)
-                    data_pca = pca.fit_transform(data_scaled).flatten()
-                    return_dict_["data_pca"]= data_pca
+                    return_dict_["data"] = pca.fit_transform(data_scaled).flatten()
+                    # return_dict_["data"]= plot_data
                     _explain_str += "Note: Using PCA first component for representativeness visualization"
-                # else:
-                #     results.append(check_representativeness(data))
-                # plt.figure(figsize=(10, 6))
-                
-                # # Plot histogram
-                # plt.hist(data, bins=n_bins, alpha=0.7, density=True)
-                
-                # # Plot kernel density estimate
-                # x_grid = np.linspace(min(data), max(data), 1000)
-                # kde = KernelDensity(bandwidth=0.5).fit(data.reshape(-1, 1))
-                # log_dens = kde.score_samples(x_grid.reshape(-1, 1))
-                # plt.plot(x_grid, np.exp(log_dens), 'r-', label='KDE')
-                
-                # plt.title('Data Distribution')
-                # plt.xlabel('Value')
-                # plt.ylabel('Density')
-                # plt.legend()
-                # plt.show()
-                
-                # # Check for zeros in the histogram bins
-                # hist, bin_edges = np.histogram(data, bins=n_bins)
-                # empty_bins = np.sum(hist == 0)
-                
-                # if empty_bins > 0:
-                #     _explain_str += f"✗ Found {empty_bins} empty regions in the distribution out of {n_bins} bins. "
-                #     _explain_str +="This might indicate gaps in your data's coverage"
-                # else:
-                #     _explain_str += "✓ No empty regions found in the distribution "
-                
-                _explain_str += "Note: Visual inspection is recommended to ensure representativeness. "
 
-            return_dict_["explain"] = _explain_str
+                if not isinstance(return_dict_["data"],np.ndarray) or return_dict_["data"].shape[0]<=0:
+                    raise ChildProcessError("Failed to impute or apply PCA returned %s" 
+                                            % type(return_dict_["data"]))
+
+                # Create figure
+                fig, ax = plt.subplots(figsize=(10, 6))
+                
+                # Plot histogram
+                ax.hist(return_dict_["data"], bins=n_bins, alpha=0.7, density=True)
+                
+                # Plot kernel density estimate
+                x_grid = np.linspace(
+                    min(return_dict_["data"]), 
+                    max(return_dict_["data"]), 1000)
+                kde = KernelDensity(bandwidth=0.5).fit(data_clean.reshape(-1, 1))
+                log_dens = kde.score_samples(x_grid.reshape(-1, 1))
+                ax.plot(x_grid, np.exp(log_dens), 'r-', label='KDE')
+                
+                ax.set_title('Data Distribution')
+                ax.set_xlabel('Value')
+                ax.set_ylabel('Density')
+                ax.legend()
+                
+                # Check for zeros in the histogram bins
+                hist, bin_edges = np.histogram(return_dict_["data"], bins=n_bins)
+                empty_bins = np.sum(hist == 0)
+                
+                _explain_str += f"empty_regions': {empty_bins},  nan_percentage: {nan_percentage}, "
+                _explain_str += f"valid_data': True, histogram: {hist}, bin_edges': {bin_edges}.\n "
+                
+                # Add text annotations
+                if empty_bins > 0:
+                    ax.text(0.02, 0.98, f"Found {empty_bins} empty regions out of {n_bins} bins", 
+                            transform=ax.transAxes, va='top', fontsize=10, color='red')
+                
+                if nan_percentage > 0:
+                    ax.text(0.02, 0.94, f"{nan_percentage:.2f}% missing values (NaNs)", 
+                            transform=ax.transAxes, va='top', fontsize=10, color='red')
 
         except Exception as err:
+            return_dict_["explain"] = _explain_str
             logger.error("%s %s \n",__s_fn_id__, err)
             logger.debug(traceback.format_exc())
             print("[Error]"+__s_fn_id__, err)
+            return return_dict_
 
         finally:
-            logger.debug("%s Representativeness Test completed with results: %s", __s_fn_id__, str(return_dict_))
+            return_dict_["plot"] = fig
+            _explain_str += "Note: Visual inspection is recommended to ensure representativeness. "
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Representativeness Test completed with %d data rows for plot", 
+                         __s_fn_id__, len(return_dict_['data']))
+            matplotlib.use(current_backend)
             return return_dict_
     
     
