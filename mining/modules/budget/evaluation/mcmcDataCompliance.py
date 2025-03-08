@@ -288,8 +288,8 @@ class dataWorkLoads(attr.properties):
                         horizontalalignment='center', verticalalignment='center',
                         transform=ax.transAxes, fontsize=14)
                 ax.set_title('Data Distribution (No Valid Data)')
-                # return_dict_["plot"] = fig
-                # raise AttributeError("%s Data containes NaN" % type(data_clean))
+                return_dict_["data"] = None
+
             else:
                 logger.warning("%s Removed %d NaN values for visualization", 
                                __s_fn_id__, (len(data) - len(data_clean)))
@@ -499,7 +499,7 @@ class dataWorkLoads(attr.properties):
             matplotlib.use(current_backend)
             return return_dict_
     
-    def check_multimodality(data, bandwidth=0.5, prominence=0.05):
+    def multimodality(data, bandwidth=0.5, prominence=0.05):
         """
         Check if the distribution appears to be multimodal.
         
@@ -517,34 +517,113 @@ class dataWorkLoads(attr.properties):
         bool
             True if multimodal, False otherwise
         """
-        # Create a KDE of the data
-        x_grid = np.linspace(min(data), max(data), 1000)
-        kde = KernelDensity(bandwidth=bandwidth).fit(data.reshape(-1, 1))
-        log_dens = kde.score_samples(x_grid.reshape(-1, 1))
-        density = np.exp(log_dens)
-        
-        # Find peaks in the density
-        peaks, properties = find_peaks(density, prominence=prominence)
-        
-        plt.figure(figsize=(10, 6))
-        plt.plot(x_grid, density)
-        plt.plot(x_grid[peaks], density[peaks], 'ro')
-        plt.title(f'Density Estimate with {len(peaks)} Detected Modes')
-        plt.xlabel('Value')
-        plt.ylabel('Density')
-        plt.show()
-        
-        if len(peaks) > 1:
-            print(f"✗ Distribution appears to be multimodal with {len(peaks)} modes")
-            print("  Multimodal distributions may require:")
-            print("  - Longer MCMC chains")
-            print("  - Multiple chains with different starting points")
-            print("  - Tempering methods")
-            return True
-        else:
-            print("✓ Distribution appears to be unimodal")
-            return False
+
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <multimodality>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "multimodality"
+        return_dict_["comply"] = None
+        return_dict_["plot"] = None
+        _explain_str = ""
+
+        current_backend = matplotlib.get_backend()
+        matplotlib.use('Agg')  # Agg backend doesn't display figures
+
+        try:
+            data_clean = data[~np.isnan(data)].reshape(-1, 1)
+            nan_count = len(data) - len(data_clean)
+            nan_percentage = 100 * nan_count / len(data) if len(data) > 0 else 0
+
+            if len(data_clean) == 0:
+                _explain_str +="✗ All data values are NaN. Cannot perform multimodality check. "
+                _explain_str +="\nempty_regions= 0, nan_percentage: 100.0, valid_data: FALSE "
+
+                # Create an empty figure if all data is NaN
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.text(0.5, 0.5, "All data values are NaN",
+                        horizontalalignment='center', verticalalignment='center',
+                        transform=ax.transAxes, fontsize=14)
+                ax.set_title("Density Estimate NO Detected Modes")
+                return_dict_["data"] = None
+            else:
+                logger.warning("%s Removed %d NaN values for visualization", 
+                               __s_fn_id__, (len(data) - len(data_clean)))
+                ''' fill NaN with mean '''
+                imputer = SimpleImputer(strategy='mean')
+                return_dict_["data"] = imputer.fit_transform(data_clean)
     
+                # Create a KDE of the data
+                fig, ax = plt.subplots(figsize=(10, 6))
+                
+                # Plot histogram
+                # ax.hist(return_dict_["data"], bins=n_bins, alpha=0.7, density=True)
+                
+                # Plot kernel density estimate
+                x_grid = np.linspace(
+                    np.min(return_dict_["data"]), 
+                    np.max(return_dict_["data"]), 1000)
+                kde = KernelDensity(bandwidth=bandwidth).fit(return_dict_["data"].reshape(-1, 1))
+                log_dens = kde.score_samples(x_grid.reshape(-1, 1))
+                density = np.exp(log_dens)
+                
+                # x_grid = np.linspace(min(data), max(data), 1000)
+                # kde = KernelDensity(bandwidth=bandwidth).fit(data.reshape(-1, 1))
+                # log_dens = kde.score_samples(x_grid.reshape(-1, 1))
+                # density = np.exp(log_dens)
+    
+                # Find peaks in the density
+                peaks, properties = find_peaks(density, prominence=prominence)
+                
+                ax.plot(x_grid, density)
+                ax.plot(x_grid[peaks], density[peaks], 'ro')
+                ax.set_title(f'Density Estimate with {len(peaks)} Detected Modes')
+                ax.set_xlabel('Value')
+                ax.set_ylabel('Density')
+                ax.legend()
+    
+                # x_grid = np.linspace(min(data), max(data), 1000)
+                # kde = KernelDensity(bandwidth=bandwidth).fit(data.reshape(-1, 1))
+                # log_dens = kde.score_samples(x_grid.reshape(-1, 1))
+                # density = np.exp(log_dens)
+                
+                # # Find peaks in the density
+                # peaks, properties = find_peaks(density, prominence=prominence)
+                
+                # plt.figure(figsize=(10, 6))
+                # plt.plot(x_grid, density)
+                # plt.plot(x_grid[peaks], density[peaks], 'ro')
+                # plt.title(f'Density Estimate with {len(peaks)} Detected Modes')
+                # plt.xlabel('Value')
+                # plt.ylabel('Density')
+                # plt.show()
+                
+                if len(peaks) > 1:
+                    _explain_str += f"✗ Distribution appears to be multimodal with {len(peaks)} modes. "
+                    _explain_str += "Multimodal distributions may require: "
+                    _explain_str += "(i) Longer MCMC chains, "
+                    _explain_str += "(ii) Multiple chains with different starting points, "
+                    _explain_str += "(iii) Tempering methods."
+                    return_dict_["comply"] = False
+                else:
+                    _explain_str += "✓ Distribution appears to be unimodal "
+                    return_dict_["comply"] = True
+    
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            matplotlib.use(current_backend)
+            return return_dict_
+
+        finally:
+            return_dict_["plot"] = fig
+            # _explain_str += "Note: Visual inspection is recommended to ensure representativeness. "
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Modality Test completed with %d data rows for plot", 
+                         __s_fn_id__, len(return_dict_['data']))
+            matplotlib.use(current_backend)
+            return return_dict_
     
     def check_boundary_conditions(data):
         """
@@ -811,6 +890,12 @@ class dataWorkLoads(attr.properties):
                 print("running CORRELATION STRUCTURE CHECK ...")
                 results.append(
                     dataWorkLoads.correlation_structure(data))
+            ''' 6. MULTIMODALITY '''
+            if "multimodality" in checks:
+                print("running MULTIMODALITY CHECK ...")
+                results.append(
+                    dataWorkLoads.multimodality(data, bandwidth=0.5, prominence=0.05))
+
             
             # print("\n==== 6. MULTIMODALITY CHECK ====")
             # if multivariate:
