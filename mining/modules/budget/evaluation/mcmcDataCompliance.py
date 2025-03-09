@@ -27,7 +27,8 @@ try:
 
     import numpy as np
     import pandas as pd
-    import matplotlib #.pyplot as plt
+    import matplotlib
+    import matplotlib.pyplot as plt
     import scipy.stats as stats
     from statsmodels.tsa.stattools import adfuller, acf
     from statsmodels.graphics.tsaplots import plot_acf
