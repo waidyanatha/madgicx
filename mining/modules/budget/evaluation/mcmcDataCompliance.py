@@ -335,7 +335,8 @@ class dataWorkLoads(attr.properties):
                 empty_bins = np.sum(hist == 0)
                 
                 _explain_str += f"empty_regions': {empty_bins},  nan_percentage: {nan_percentage},\n"
-                _explain_str += f"valid_data': True, histogram: {hist}, bin_edges': {bin_edges}.\n "
+                _explain_str += f"valid_data': True, bin_edges': {bin_edges}.\n "
+                return_dict_["data"]=hist
                 
                 # Add text annotations
                 if empty_bins > 0:
@@ -424,6 +425,11 @@ class dataWorkLoads(attr.properties):
             return return_dict_
 
     
+    ''' Function --- CORRELATION STRUCTURE ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
     def correlation_structure(data):
         """
         Analyze the correlation structure of the data.
@@ -500,6 +506,11 @@ class dataWorkLoads(attr.properties):
             matplotlib.use(current_backend)
             return return_dict_
     
+    ''' Function --- MULTIMODALITY ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
     def multimodality(data, bandwidth=0.5, prominence=0.05):
         """
         Check if the distribution appears to be multimodal.
@@ -536,6 +547,7 @@ class dataWorkLoads(attr.properties):
             nan_percentage = 100 * nan_count / len(data) if len(data) > 0 else 0
 
             if len(data_clean) == 0:
+                return_dict_["comply"] = False
                 _explain_str +="✗ All data values are NaN. Cannot perform multimodality check. "
                 _explain_str +="\nempty_regions= 0, nan_percentage: 100.0, valid_data: FALSE "
 
@@ -556,9 +568,6 @@ class dataWorkLoads(attr.properties):
                 # Create a KDE of the data
                 fig, ax = plt.subplots(figsize=(10, 6))
                 
-                # Plot histogram
-                # ax.hist(return_dict_["data"], bins=n_bins, alpha=0.7, density=True)
-                
                 # Plot kernel density estimate
                 x_grid = np.linspace(
                     np.min(return_dict_["data"]), 
@@ -566,12 +575,7 @@ class dataWorkLoads(attr.properties):
                 kde = KernelDensity(bandwidth=bandwidth).fit(return_dict_["data"].reshape(-1, 1))
                 log_dens = kde.score_samples(x_grid.reshape(-1, 1))
                 density = np.exp(log_dens)
-                
-                # x_grid = np.linspace(min(data), max(data), 1000)
-                # kde = KernelDensity(bandwidth=bandwidth).fit(data.reshape(-1, 1))
-                # log_dens = kde.score_samples(x_grid.reshape(-1, 1))
-                # density = np.exp(log_dens)
-    
+
                 # Find peaks in the density
                 peaks, properties = find_peaks(density, prominence=prominence)
                 
@@ -581,33 +585,17 @@ class dataWorkLoads(attr.properties):
                 ax.set_xlabel('Value')
                 ax.set_ylabel('Density')
                 ax.legend()
-    
-                # x_grid = np.linspace(min(data), max(data), 1000)
-                # kde = KernelDensity(bandwidth=bandwidth).fit(data.reshape(-1, 1))
-                # log_dens = kde.score_samples(x_grid.reshape(-1, 1))
-                # density = np.exp(log_dens)
-                
-                # # Find peaks in the density
-                # peaks, properties = find_peaks(density, prominence=prominence)
-                
-                # plt.figure(figsize=(10, 6))
-                # plt.plot(x_grid, density)
-                # plt.plot(x_grid[peaks], density[peaks], 'ro')
-                # plt.title(f'Density Estimate with {len(peaks)} Detected Modes')
-                # plt.xlabel('Value')
-                # plt.ylabel('Density')
-                # plt.show()
-                
+
                 if len(peaks) > 1:
                     _explain_str += f"✗ Distribution appears to be multimodal with {len(peaks)} modes. "
                     _explain_str += "Multimodal distributions may require: "
                     _explain_str += "(i) Longer MCMC chains, "
                     _explain_str += "(ii) Multiple chains with different starting points, "
                     _explain_str += "(iii) Tempering methods."
-                    return_dict_["comply"] = False
+                    return_dict_["comply"] = True
                 else:
                     _explain_str += "✓ Distribution appears to be unimodal "
-                    return_dict_["comply"] = True
+                    return_dict_["comply"] = False
     
         except Exception as err:
             return_dict_["explain"] = _explain_str
@@ -619,14 +607,18 @@ class dataWorkLoads(attr.properties):
 
         finally:
             return_dict_["plot"] = fig
-            # _explain_str += "Note: Visual inspection is recommended to ensure representativeness. "
             return_dict_["explain"] = _explain_str
             logger.debug("%s Modality Test completed with %d data rows for plot", 
                          __s_fn_id__, len(return_dict_['data']))
             matplotlib.use(current_backend)
             return return_dict_
     
-    def check_boundary_conditions(data):
+    ''' Function --- BOUNDARY CONDITION ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
+    def boundary_conditions(data):
         """
         Check for boundary conditions or constraints in the data.
         
@@ -635,42 +627,70 @@ class dataWorkLoads(attr.properties):
         data : array-like
             Data to test
         """
-        # Check for common boundary types
-        min_val = np.min(data)
-        max_val = np.max(data)
-        
-        # Calculate distance from min/max to next closest points
-        sorted_data = np.sort(data)
-        min_gap = np.min(np.diff(sorted_data))
-        
-        # Check if data is close to 0, 1, or other common boundaries
-        boundaries = {
-            '0': 0,
-            '1': 1,
-            'Integer values': np.all(data == np.round(data))
-        }
-        
-        print("Potential boundary conditions:")
-        print(f"Data range: [{min_val}, {max_val}]")
-        
-        for name, value in boundaries.items():
-            if name == 'Integer values':
-                if value:
-                    print(f"✗ Data appears to be discrete (integer-valued)")
-                    print("  Discrete parameters require special MCMC approaches")
-            else:
-                if np.any(np.isclose(data, value, atol=min_gap)):
-                    print(f"✗ Data contains values very close to {name}")
-                    print("  Boundary constraints may require specialized MCMC")
-        
-        # Check for potential truncation
-        if np.isclose(min_val, max_val - (max_val - min_val) * 0.05, atol=min_gap) or \
-           np.isclose(max_val, min_val + (max_val - min_val) * 0.05, atol=min_gap):
-            print("✗ Data may be truncated (high concentration at extremes)")
-            print("  Truncated distributions require special handling")
+
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <boundary_conditions>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "boundary conditions"
+        return_dict_["comply"] = True
+        return_dict_["plot"] = None
+        _explain_str = ""
+
+        try:
+            ''' Check for common boundary types '''
+            min_val = np.min(data)
+            max_val = np.max(data)
+            ''' Calculate distance from min/max to next closest points '''
+            sorted_data = np.sort(data)
+            min_gap = np.min(np.diff(sorted_data))
+            ''' Check if data is close to 0, 1, or other common boundaries'''
+            boundaries = {
+                '0': 0,
+                '1': 1,
+                'Integer values': np.all(data == np.round(data))
+            }
+            _explain_str += "Potential boundary conditions: "
+            _explain_str +=f"Data range: [{min_val}, {max_val}]. "
+            
+            for name, value in boundaries.items():
+                if name == 'Integer values':
+                    if value:
+                        return_dict_["comply"]=False
+                        _explain_str +=f"✗ Data appears to be discrete (integer-valued) "
+                        _explain_str += "Discrete parameters require special MCMC approaches. "
+                else:
+                    if np.any(np.isclose(data, value, atol=min_gap)):
+                        return_dict_["comply"]=False
+                        _explain_str += f"✗ Data contains values very close to {name}. "
+                        _explain_str += "Boundary constraints may require specialized MCMC. "
+            
+            ''' Check for potential truncation '''
+            if np.isclose(min_val, max_val - (max_val - min_val) * 0.05, atol=min_gap) or \
+               np.isclose(max_val, min_val + (max_val - min_val) * 0.05, atol=min_gap):
+                return_dict_["comply"]=False
+                _explain_str += "✗ Data may be truncated (high concentration at extremes). "
+                _explain_str += "Truncated distributions require special handling. "
+
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            return return_dict_
+
+        finally:
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Boundary Conditions Test completed, %s", 
+                         __s_fn_id__, str(return_dict_))
+            return return_dict_
+
     
-    
-    def check_mixing_properties(data, lag=1):
+    ''' Function --- MIXING PROPERTY ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
+    def mixing_properties(data, lag=1):
         """
         For time series data, check properties that might affect mixing.
         
@@ -681,30 +701,69 @@ class dataWorkLoads(attr.properties):
         lag : int
             Lag for checking autocorrelation
         """
-        # Calculate autocorrelation
-        acf_1 = acf(data, nlags=lag)[-1]
-        
-        plt.figure(figsize=(10, 6))
-        plt.scatter(data[:-lag], data[lag:], alpha=0.5)
-        plt.title(f'Lag-{lag} Plot (r = {acf_1:.3f})')
-        plt.xlabel(f'X(t)')
-        plt.ylabel(f'X(t+{lag})')
-        plt.grid(True)
-        plt.show()
-        
-        if abs(acf_1) > 0.7:
-            print(f"✗ High lag-{lag} autocorrelation detected: {acf_1:.3f}")
-            print("  High autocorrelation may lead to poor mixing")
-            print("  Consider:")
-            print("  - Thinning your MCMC chain")
-            print("  - Using longer burn-in periods")
-            print("  - More efficient MCMC samplers (HMC, NUTS)")
-        else:
-            print(f"✓ Lag-{lag} autocorrelation is moderate: {acf_1:.3f}")
-            print("  Mixing properties look reasonable")
+
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <mixing_properties>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "mixing properties"
+        return_dict_["comply"] = None
+        return_dict_["plot"] = None
+        _explain_str = ""
+
+        current_backend = matplotlib.get_backend()
+        matplotlib.use('Agg')  # Agg backend doesn't display figures
+            
+        try:
+            # current_backend = matplotlib.get_backend()
+            # matplotlib.use('Agg')  # Agg backend doesn't display figures
+
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Calculate autocorrelation
+            acf_1 = acf(data.reshape(-1), nlags=lag)[-1]
+            
+            # plt.figure(figsize=(10, 6))
+            ax.scatter(data[:-lag], data[lag:], alpha=0.5)
+            ax.set_title(f'Lag-{lag} Plot (r = {acf_1:.3f})')
+            ax.set_xlabel(f'X(t)')
+            ax.set_ylabel(f'X(t+{lag})')
+            ax.grid(True)
+            # plt.show()
+
+            if abs(acf_1) > 0.7:
+                return_dict_["comply"]=False
+                _explain_str += f"✗ High lag-{lag} autocorrelation detected: {acf_1:.3f}. "
+                _explain_str += "High autocorrelation may lead to poor mixing "
+                _explain_str += "Consider: "
+                _explain_str += "(i) Thinning your MCMC chain, "
+                _explain_str += "(ii) Using longer burn-in periods, "
+                _explain_str += "(iii) More efficient MCMC samplers (HMC, NUTS). "
+            else:
+                return_dict_["comply"]=True
+                _explain_str += f"✓ Lag-{lag} autocorrelation is moderate: {acf_1:.3f}. "
+                _explain_str += "Mixing properties look reasonable. "
+
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            return return_dict_
+
+        finally:
+            return_dict_["plot"] = fig
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Mixing properties Test completed, %s", 
+                         __s_fn_id__, str(return_dict_))
+            return return_dict_
+
     
-    
-    def check_prior_knowledge(data):
+    ''' Function --- PRIOR KNOWLEDGE ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
+    def prior_knowledge(data):
         """
         Evaluate if the data aligns with common distributions
         to help with prior selection.
@@ -714,43 +773,75 @@ class dataWorkLoads(attr.properties):
         data : array-like
             Data to test
         """
-        # Normalize data for distribution testing
-        data_norm = (data - np.mean(data)) / np.std(data)
-        
-        # List of distributions to test
-        distributions = [
-            ('Normal', stats.norm),
-            ('Student-t', stats.t),
-            ('Cauchy', stats.cauchy),
-            ('Laplace', stats.laplace),
-            ('Logistic', stats.logistic)
-        ]
-        
-        # Perform Kolmogorov-Smirnov tests
-        results = []
-        for name, dist in distributions:
-            statistic, p_value = stats.kstest(data_norm, dist.cdf)
-            results.append((name, p_value, statistic))
-        
-        # Sort by p-value (higher is better fit)
-        results.sort(key=lambda x: x[1], reverse=True)
-        
-        print("Distribution fitting results (higher p-value = better fit):")
-        for name, p_value, statistic in results:
-            print(f"  {name}: p-value = {p_value:.4f}, KS statistic = {statistic:.4f}")
-        
-        # Suggest priors based on best fit
-        best_dist = results[0][0]
-        print(f"\nBased on your data, consider priors related to the {best_dist} distribution")
-        
-        if results[0][1] < 0.05:
-            print("✗ No common distribution fits well (all p-values < 0.05)")
-            print("  Consider non-parametric or mixture priors")
-        else:
-            print(f"✓ {best_dist} distribution is a reasonable fit (p-value > 0.05)")
+
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <prior_knowledge>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "prior knowledge"
+        return_dict_["comply"] = None
+        return_dict_["plot"] = None
+        _explain_str = ""
+
+        try:
+            # Normalize data for distribution testing
+            data_norm = ((data - np.mean(data)) / np.std(data)).reshape(-1)
+            # List of distributions to test
+            distributions = [
+                ('Normal', stats.norm.cdf),
+                ('Student-t 5df', lambda x: stats.t.cdf(x, df=5)),  # Using df=5 as an example
+                ('Student-t 10df', lambda x: stats.t.cdf(x, df=10)), # Add multiple df values to test
+                # ('Student-t', stats.t),
+                ('Cauchy', stats.cauchy.cdf),
+                ('Laplace', stats.laplace.cdf),
+                ('Logistic', stats.logistic.cdf),
+                # ('Poisson', lambda x: stats.poisson.cdf(x, mu=np.mean(x))), # Add multiple df values to test
+            ]
+            # Perform Kolmogorov-Smirnov tests
+            results = []
+            for name, dist in distributions:
+                statistic, p_value = stats.kstest(data_norm, dist)
+                results.append((name, p_value, statistic))
+            # Sort by p-value (higher is better fit)
+            results.sort(key=lambda x: x[1], reverse=True)
+
+            _explain_str += "Distribution fitting results (higher p-value = better fit): "
+            i=0
+            for name, p_value, statistic in results:
+                i+=1
+                _explain_str += f"({i}) {name}: p-value = {p_value:.4f}, KS statistic = {statistic:.4f}. "
+            
+            # Suggest priors based on best fit
+            best_dist = results[0][0]
+            _explain_str += f"\nBased on your data, consider priors related to the {best_dist} distribution. "
+            
+            if results[0][1] < 0.05:
+                return_dict_["comply"]=False
+                _explain_str += "✗ No common distribution fits well (all p-values < 0.05). "
+                _explain_str += "Consider non-parametric or mixture priors. "
+            else:
+                return_dict_["comply"]=True
+                _explain_str += f"✓ {best_dist} distribution is a reasonable fit (p-value > 0.05) "
     
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            return return_dict_
+
+        finally:
+            return_dict_["explain"] = _explain_str
+            logger.debug("%s Prior knowledge Test completed, %s", 
+                         __s_fn_id__, str(return_dict_))
+            return return_dict_
+
     
-    def check_noise_characteristics(data):
+    ''' Function --- NOISE CHARACTERISTICS ---
+
+            author: <samana.thetha@gmail.com
+    '''
+    @staticmethod
+    def noise_characteristics(data):
         """
         Analyze noise characteristics in the data.
         
@@ -759,63 +850,96 @@ class dataWorkLoads(attr.properties):
         data : array-like
             Data to test
         """
-        # Calculate differences to examine noise
-        diffs = np.diff(data)
-        
-        # Test for heteroskedasticity (changing variance)
-        window_size = min(100, len(diffs) // 5)
-        rolling_std = pd.Series(diffs).rolling(window=window_size).std().dropna()
-        
-        plt.figure(figsize=(10, 8))
-        
-        # Plot 1: Original data
-        plt.subplot(3, 1, 1)
-        plt.plot(data)
-        plt.title('Original Data')
-        plt.grid(True)
-        
-        # Plot 2: Differences
-        plt.subplot(3, 1, 2)
-        plt.plot(diffs)
-        plt.title('First Differences (Noise)')
-        plt.grid(True)
-        
-        # Plot 3: Rolling standard deviation
-        plt.subplot(3, 1, 3)
-        plt.plot(rolling_std)
-        plt.title('Rolling Standard Deviation of Noise')
-        plt.grid(True)
-        
-        plt.tight_layout()
-        plt.show()
-        
-        # QQ plot to check noise normality
-        plt.figure(figsize=(8, 8))
-        stats.probplot(diffs, dist="norm", plot=plt)
-        plt.title('Q-Q Plot of Noise')
-        plt.grid(True)
-        plt.show()
-        
-        # Test for heteroskedasticity
-        std_ratio = np.max(rolling_std) / np.min(rolling_std)
-        
-        if std_ratio > 2:
-            print(f"✗ Heteroskedasticity detected (std ratio: {std_ratio:.2f})")
-            print("  Consider:")
-            print("  - Transformation to stabilize variance")
-            print("  - MCMC methods that account for varying noise")
-        else:
-            print(f"✓ Noise appears homoskedastic (std ratio: {std_ratio:.2f})")
-        
-        # Test for normality of noise
-        _, p_value = stats.normaltest(diffs)
-        
-        if p_value < 0.05:
-            print(f"✗ Noise is not normally distributed (p-value: {p_value:.4f})")
-            print("  Consider MCMC likelihood functions that match your noise distribution")
-        else:
-            print(f"✓ Noise appears normally distributed (p-value: {p_value:.4f})")
-    
+
+        __s_fn_id__ = f"{dataWorkLoads.__name__} function <noise_characteristics>"
+
+        return_dict_ = {}
+        return_dict_["check"] = "noise characteristics"
+        return_dict_["comply"] = None
+        return_dict_["plot"] = None
+        _explain_str = ""
+
+        current_backend = matplotlib.get_backend()
+        matplotlib.use('Agg')  # Agg backend doesn't display figures
+            
+        try:
+            # Calculate differences to examine noise
+            diffs = np.diff(data.reshape(-1))
+            
+            # Test for heteroskedasticity (changing variance)
+            window_size = min(100, len(diffs) // 5)
+            rolling_std = pd.Series(diffs).rolling(window=window_size).std().dropna()
+            # Test for heteroskedasticity
+            std_ratio = np.max(rolling_std) / np.min(rolling_std)
+
+            if std_ratio > 2:
+                return_dict_["comply"]=False
+                _explain_str += f"✗ Heteroskedasticity detected (std ratio: {std_ratio:.2f}). "
+                _explain_str += "Consider: "
+                _explain_str += "(i) Transformation to stabilize variance, "
+                _explain_str += "(ii) MCMC methods that account for varying noise. "
+            else:
+                return_dict_["comply"]=True
+                _explain_str += f"✓ Noise appears homoskedastic (std ratio: {std_ratio:.2f}). "
+            
+            # Test for normality of noise
+            _, p_value = stats.normaltest(diffs)
+            
+            if p_value < 0.05:
+                return_dict_["comply"]=False
+                _explain_str += f"✗ Noise is not normally distributed (p-value: {p_value:.4f}). "
+                _explain_str += "  Consider MCMC likelihood functions that match your noise distribution. "
+            else:
+                return_dict_["comply"]=True
+                _explain_str += f"✓ Noise appears normally distributed (p-value: {p_value:.4f}). "
+
+            # Create a single figure with 4 subplots
+            fig = plt.figure(figsize=(10, 12))  # Make the figure taller to accommodate 4 plots
+            
+            # Plot 1: Original data
+            ax1 = fig.add_subplot(4, 1, 1)
+            ax1.plot(data)
+            ax1.set_title('Original Data')
+            ax1.grid(True)
+            
+            # Plot 2: Differences
+            ax2 = fig.add_subplot(4, 1, 2)
+            ax2.plot(diffs)
+            ax2.set_title('First Differences (Noise)')
+            ax2.grid(True)
+            
+            # Plot 3: Rolling standard deviation
+            ax3 = fig.add_subplot(4, 1, 3)
+            ax3.plot(rolling_std)
+            ax3.set_title('Rolling Standard Deviation of Noise')
+            ax3.grid(True)
+            
+            # Plot 4: QQ plot to check noise normality
+            ax4 = fig.add_subplot(4, 1, 4)
+            stats.probplot(diffs, dist="norm", plot=ax4)
+            ax4.set_title('Q-Q Plot of Noise')
+            ax4.grid(True)
+            
+            # Adjust spacing between subplots
+            plt.tight_layout()
+            
+            # Store the figure in the return dictionary
+            # return_dict_["plot"] = fig
+        except Exception as err:
+            return_dict_["explain"] = _explain_str
+            logger.error("%s %s \n",__s_fn_id__, err)
+            logger.debug(traceback.format_exc())
+            print("[Error]"+__s_fn_id__, err)
+            return return_dict_
+
+        finally:
+            return_dict_["explain"]=_explain_str
+            return_dict_["plot"] = fig
+            # return_dict_["plot"] = fig
+            logger.debug("%s Noise Characteristics Test completed, %s", 
+                         __s_fn_id__, str(return_dict_))
+            return return_dict_
+
     
     def run_checks(
         self,
@@ -852,7 +976,9 @@ class dataWorkLoads(attr.properties):
             has_nans = np.any(nan_mask)
             if has_nans:
                 print(f"Warning: Data contains NaN values. Handling them appropriately in each test.")
-    
+                logger.warning("%s Data contains NaN values. Handling them appropriately in each test."
+                               , __s_fn_id__)
+                
             # Ensure data is in the right format
             if multivariate and len(data.shape) == 1:
                 data = data.reshape(-1, 1)
@@ -862,7 +988,7 @@ class dataWorkLoads(attr.properties):
             results = []
             ''' 1. STATIONARITY '''
             if "stationarity" in checks and time_series:
-                print("running STATIONARITY CHECK ...")
+                print("running STATIONARITY check ...")
                 results.append(dataWorkLoads.stationarity(
                     data if len(data.shape) == 1 else data[:, 0],
                     multivariate,))
@@ -873,29 +999,49 @@ class dataWorkLoads(attr.properties):
                 pass
             ''' 2. DATA VOLUME '''
             if "data volume" in checks:
-                print("running DATA VOLUME CHECK ...")
+                print("running DATA VOLUME check ...")
                 results.append(dataWorkLoads.data_volume(data=data))
             ''' 3. REPRESENTATIVENESS '''
             if "representativeness" in checks:
-                print("running REPRESENTATIVENESS CHECK ...")
+                print("running REPRESENTATIVENESS check ...")
                 results.append(
                     dataWorkLoads.representativeness(data=data, 
                     multivariate=multivariate))
             ''' 4. DIMENSIONALITY '''
             if "dimensionality" in checks:
-                print("running DIMENSIONALITY CHECK ...")
+                print("running DIMENSIONALITY check ...")
                 results.append(
                     dataWorkLoads.dimensionality(data, max_recommended_dim=20))
             ''' 5. CORRELATION STRUCTURE '''
             if "correlation structure" in checks:
-                print("running CORRELATION STRUCTURE CHECK ...")
+                print("running CORRELATION STRUCTURE check ...")
                 results.append(
                     dataWorkLoads.correlation_structure(data))
             ''' 6. MULTIMODALITY '''
             if "multimodality" in checks:
-                print("running MULTIMODALITY CHECK ...")
+                print("running MULTIMODALITY check ...")
                 results.append(
                     dataWorkLoads.multimodality(data, bandwidth=0.5, prominence=0.05))
+            ''' 7. BOUNDARY CONDITIONS '''
+            if "boundary conditions" in checks:
+                print("running BOUNDARY CONDITIONS check ...")
+                results.append(
+                    dataWorkLoads.boundary_conditions(data))
+            ''' 8. MIXING PROPERTY '''
+            if "mixing properties" in checks:
+                print("running MIXING PROPERTY check ...")
+                results.append(
+                    dataWorkLoads.mixing_properties(data, lag=1))
+            ''' 9. PRIOR KNOWLEDGE '''
+            if "prior knowledge" in checks:
+                print("running PRIOR KNOWLEDGE check ...")
+                results.append(
+                    dataWorkLoads.prior_knowledge(data))
+            ''' 10. NOISE CHARACTERISTICS '''
+            if "noise characteristics" in checks:
+                print("running NOISE CHARACTERISTICS check ...")
+                results.append(
+                    dataWorkLoads.noise_characteristics(data))
 
             
             # print("\n==== 6. MULTIMODALITY CHECK ====")
