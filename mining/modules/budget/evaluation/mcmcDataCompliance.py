@@ -58,7 +58,7 @@ except Exception as e:
 
 '''
 
-class dataWorkLoads(attr.properties):
+class evalWorkLoads(attr.properties):
 
     ''' Function --- INIT ---
 
